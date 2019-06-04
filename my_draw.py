@@ -23,20 +23,24 @@ class Settings:
 		plt.rcParams['axes.grid'] = True
 		plt.rcParams['lines.linewidth'] = 5
 		plt.rcParams['font.size'] = 28
+		plt.rcParams['axes.labelweight'] = 'bold'
 
 	def set_heatmap():
 		plt.rcParams['font.size'] = 28
 		plt.rcParams['figure.figsize'] = [20, 10]
 
 class Draw:
-	def heatmap(df,start,end,xticks,xticklabels,yticks,yticklabels,cmap,transpose = False,save_path = ''):	   
+	def heatmap(df,start,end,xticks,xticklabels,yticks,yticklabels,cmap,borders=False,transpose = False,save_path = ''):	   
 		plt.clf()
 		plt.cla()
 		Settings.set_heatmap()
 		df = pd.DataFrame(df.iloc[start:end])
 		if transpose:
 			df = df.transpose().iloc[::-1]
-		pic = sns.heatmap(df,xticklabels=False,yticklabels=False,cmap=cmap,cbar_kws = dict(use_gridspec=False,location="top"))
+		if(borders!=False):
+			pic = sns.heatmap(df,vmin=borders[0],vmax=borders[1],xticklabels=False,yticklabels=False,cmap=cmap,cbar_kws = dict(use_gridspec=False,location="top"))
+		else:
+			pic = sns.heatmap(df,xticklabels=False,yticklabels=False,cmap=cmap,cbar_kws = dict(use_gridspec=False,location="top"))
 		pic.set_xticks(xticks)
 		pic.set_xticklabels(xticklabels)
 		pic.set_yticks(yticks)
@@ -76,25 +80,68 @@ class Result:
 			del self.meta['InitStateV']
 			self.meta['TimeLineQuant']*=self.meta['TimeQuant']
 			self.space_net = np.fromiter([i * self.meta['SpaceQuant'] for i in range(0,int(self.meta['SpaceRange']/self.meta['SpaceQuant']))],dtype=np.float)
-	def draw_end_u(self,color='g'):
-		Settings.set_lineplot()
-		sns.lineplot(self.space_net, self.end_u,color=color)
-	def draw_start_u(self):
-		Settings.set_lineplot()
-		sns.lineplot(self.space_net, self.start_u)
-	def draw_end_v(self):
-		Settings.set_lineplot()
-		sns.lineplot(self.space_net, self.end_v)
-	def draw_start_v(self):
-		set_lineplot()
-		sns.lineplot(self.space_net, self.start_v)
-	def draw_heatmap(self,start, end,x_freq, cmap = 'rainbow', display = True):
-		Settings.set_heatmap()
-		plt.clf()
+	def check_data(self):
 		if not hasattr(self,'data'):
 			onlyfiles = [os.path.join(Settings.data_dir, f) for f in os.listdir(Settings.data_dir) if os.path.isfile(os.path.join(Settings.data_dir, f))]
 			path_to_data = next(filter(lambda x: str(self.meta['Id']) in x and '_data' in x,onlyfiles))
 			self.data = pd.read_csv(path_to_data,sep=';',dtype=np.float)
+	def draw_end_u(self,color='g'):
+		Settings.set_lineplot()
+		sns.lineplot(self.space_net, self.end_u,color=color)
+		plt.show()
+	def draw_start_u(self,color='g'):
+		Settings.set_lineplot()
+		sns.lineplot(self.space_net, self.start_u,color=color)
+		plt.show()
+	def draw_end_v(self):
+		Settings.set_lineplot()
+		sns.lineplot(self.space_net, self.end_v)
+		plt.show()
+	def draw_start_v(self):
+		set_lineplot()
+		sns.lineplot(self.space_net, self.start_v)
+		plt.show()
+	def draw_u(self,index,color='b'):
+		Settings.set_lineplot()
+		self.check_data()
+		kek = np.array(self.data.iloc()[int(index/self.meta['TimeLineQuant'])])
+		sns.lineplot(self.space_net, kek,color=color)
+		plt.show()
+	def draw_minimax(self,start,end,x_freq,min_color='b',max_color='r'):
+		self.check_data()
+		start_scaled = max(0,int(start/self.meta['TimeLineQuant']))
+		end_scaled = min(int(end/self.meta['TimeLineQuant']),len(self.data.index)-1)
+		mins = np.zeros(end_scaled-start_scaled,dtype=np.float)
+		maxs = np.zeros(end_scaled-start_scaled,dtype=np.float)
+		for ind, row in self.data.iloc()[start_scaled:end_scaled].iterrows():
+			mins[ind-start_scaled] = row.min()
+			maxs[ind-start_scaled] = row.max()
+		Settings.set_lineplot()
+		plt.clf()
+		x_freq_scaled = int(x_freq/self.meta['TimeLineQuant'])
+		xticks = np.linspace(0,(end_scaled-start_scaled) - (end_scaled-start_scaled)%x_freq_scaled,x_freq+1,dtype=np.int)
+		xticklabels = np.array([int(x*self.meta['TimeLineQuant']+start) for x in xticks],dtype=np.str)
+		xticklabels[-1] = 't'
+		yticks = np.linspace(0,self.meta['SpaceRange']/self.meta['SpaceQuant'],5,dtype=np.int)
+		ytickslabels = np.linspace(0,self.meta['SpaceRange'],5,dtype=np.int)
+		ytickslabels = np.array(ytickslabels,dtype=np.str)
+		ytickslabels[0]=''
+		ytickslabels[-1] = 'x'
+		plt.plot(np.arange(start,end,self.meta['TimeLineQuant']),mins,color=min_color)
+		plt.xticks = xticks
+		plt.xticklabels = xticklabels
+		plt.yticks = yticks
+		plt.yticklabels = ytickslabels
+		plt.plot(np.arange(start,end,self.meta['TimeLineQuant']),maxs,color=max_color)
+		plt.xticks = xticks
+		plt.xticklabels = xticklabels
+		plt.yticks = yticks
+		plt.yticklabels = ytickslabels
+		plt.show()
+	def draw_heatmap(self,start, end,x_freq,borders=False, cmap = 'rainbow', display = True):
+		Settings.set_heatmap()
+		plt.clf()
+		self.check_data()
 		start_scaled = max(0,int(start/self.meta['TimeLineQuant']))
 		end_scaled = min(int(end/self.meta['TimeLineQuant']),len(self.data.index)-1)
 		if display:
@@ -110,7 +157,7 @@ class Result:
 		ytickslabels = np.array(ytickslabels,dtype=np.str)
 		ytickslabels[0]=''
 		ytickslabels[-1] = 'x'
-		Draw.heatmap(self.data,start_scaled,end_scaled,xticks,xticklabels,yticks,ytickslabels,cmap,True,savepath)
+		Draw.heatmap(self.data,start_scaled,end_scaled,xticks,xticklabels,yticks,ytickslabels,cmap,borders,True,savepath)
 	def draw_fourier(self,start,end,names):
 		if not hasattr(self,'data_f'):
 			onlyfiles = [os.path.join(Settings.fourier_dir, f) for f in os.listdir(Settings.fourier_dir) if os.path.isfile(os.path.join(Settings.fourier_dir, f))]
